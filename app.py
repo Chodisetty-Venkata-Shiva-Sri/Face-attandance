@@ -5,19 +5,20 @@ import numpy as np
 from datetime import datetime
 from pymongo import MongoClient
 import base64
+import certifi
 
 app = Flask(__name__)
 
 # ==========================================
-# 🌩️ MONGODB CLOUD CONNECTION
+# 🌩️ MONGODB CLOUD CONNECTION (Secured)
 # ==========================================
 MONGO_URI = "mongodb+srv://robokalamshivasri_db_user:uVjzpyjP2a9fklww@faceattendance.b7km6n1.mongodb.net/?retryWrites=true&w=majority&appName=FaceAttendance"
-client = MongoClient(MONGO_URI)
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client['face_attendance_db']
 users_col = db['users'] 
 logs_col = db['logs']   
 
-# 1. Load Faces from DB
+# Face data load chese function (Ippudu idhi direct ga run avvadu)
 def load_known_faces():
     known_encodings = []
     known_names = []
@@ -26,25 +27,13 @@ def load_known_faces():
         known_names.append(user['roll'])
     return known_encodings, known_names
 
-known_face_encodings, known_face_names = load_known_faces()
-
-# 2. STRICT 2-PUNCH LOGIC (IN & OUT ONLY)
 def get_attendance_status(roll):
     today = datetime.now().strftime('%d-%m-%Y')
     record = logs_col.find_one({"roll": roll, "date": today})
-    
-    # 1st Scan: Record lekapothe IN Time padali
-    if not record: 
-        return "new"
-    
-    # 2nd Scan: Record undi, kani OUT time inka padaledu ("-")
-    if record.get("out_time") == "-": 
-        return "update_out"
-    
-    # 3rd Scan: Record undi, OUT time kuda padipoindi (Locked)
+    if not record: return "new"
+    if record.get("out_time") == "-": return "update_out"
     return "completed"
 
-# 3. Mark IN or OUT Attendance
 def mark_attendance(roll):
     today = datetime.now().strftime('%d-%m-%Y')
     now_time = datetime.now().strftime("%H:%M:%S")
@@ -52,12 +41,9 @@ def mark_attendance(roll):
     
     if status == "new":
         logs_col.insert_one({"roll": roll, "in_time": now_time, "out_time": "-", "date": today})
-        print(f"✅ IN TIME Logged: {roll}")
     elif status == "update_out":
         logs_col.update_one({"roll": roll, "date": today}, {"$set": {"out_time": now_time}})
-        print(f"✅ OUT TIME Updated: {roll}")
 
-# Helper: Convert Base64 from Browser to OpenCV Image
 def decode_base64_image(base64_string):
     if ',' in base64_string:
         base64_string = base64_string.split(',')[1]
@@ -89,11 +75,8 @@ def mark_attendance_page():
 def mark_attendance_cam_page():
     sid = request.form['student_id'].upper()
     status = get_attendance_status(sid)
-    
-    # Oka vela already 2 times scan ayipothe, direct ga block chesesthundi
     if status == "completed":
         return render_template('index.html', page='already_marked', roll=sid)
-        
     return render_template('index.html', page='attendance_cam', sid=sid)
 
 @app.route('/attendance_success')
@@ -132,8 +115,6 @@ def api_register():
     if encodings:
         avg_encoding = np.mean(encodings, axis=0).tolist()
         users_col.update_one({"roll": roll}, {"$set": {"encoding": avg_encoding}}, upsert=True)
-        global known_face_encodings, known_face_names
-        known_face_encodings, known_face_names = load_known_faces()
         return jsonify({"status": "success"})
     
     return jsonify({"status": "failed"})
@@ -149,6 +130,9 @@ def api_recognize():
     
     if not face_encodes:
         return jsonify({"status": "no_face"})
+
+    # 💡 Ippudu Database nundi check chesthundi!
+    known_face_encodings, known_face_names = load_known_faces()
 
     for encodeFace in face_encodes:
         if len(known_face_encodings) > 0:
@@ -169,4 +153,6 @@ def api_recognize():
     return jsonify({"status": "unrecognized"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
