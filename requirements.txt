@@ -6,5 +6,6 @@ pymongo
 gunicorn
 dlib-bin==19.24.2
 face-recognition-models
+face_recognition
 Click
 Pillow
