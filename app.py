@@ -13,7 +13,7 @@ app = Flask(__name__)
 # 🌩️ MONGODB CLOUD CONNECTION (Secured)
 # ==========================================
 MONGO_URI = "mongodb+srv://robokalamshivasri_db_user:uVjzpyjP2a9fklww@faceattendance.b7km6n1.mongodb.net/?retryWrites=true&w=majority&appName=FaceAttendance"
-client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), connect=False)
 db = client['face_attendance_db']
 users_col = db['users'] 
 logs_col = db['logs']   
