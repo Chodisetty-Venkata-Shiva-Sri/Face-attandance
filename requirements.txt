@@ -2,7 +2,9 @@ Flask
 opencv-python-headless
 numpy==1.26.4
 cmake
-dlib
-face_recognition
 pymongo
 gunicorn
+dlib-bin==19.24.2
+face-recognition-models
+Click
+Pillow
